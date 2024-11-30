@@ -10,6 +10,7 @@ import { UpdateLocationListener, UpdateStatusListener } from './listeners';
 import { ProfileController } from './profile.controller';
 import { ProfileService } from './profile.service';
 import RedisService from '@common/services/redis.service';
+import { SocketModule } from '@modules/socket/socket.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import RedisService from '@common/services/redis.service';
       { name: QUEUE_NAMES.UPDATE_STATUS },
       { name: QUEUE_NAMES.WORK_STATUS },
     ),
+    SocketModule,
   ],
   controllers: [ProfileController],
   providers: [

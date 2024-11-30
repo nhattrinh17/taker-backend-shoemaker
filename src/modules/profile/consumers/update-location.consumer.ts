@@ -8,7 +8,7 @@ import { Repository } from 'typeorm';
 import { Location, QUEUE_NAMES, RESOLUTION } from '@common/index';
 
 import { Shoemaker } from '@entities/index';
-// import { GatewaysService } from '@gateways/gateways.service';
+import { SocketService } from '@modules/socket/socket.service';
 
 @Processor(QUEUE_NAMES.UPDATE_LOCATION)
 export class UpdateLocationConsumer {
@@ -17,7 +17,7 @@ export class UpdateLocationConsumer {
   constructor(
     @InjectRepository(Shoemaker)
     private readonly shoemakerRepository: Repository<Shoemaker>,
-    // private readonly gateWaysService: GatewaysService,
+    private readonly socketService: SocketService,
   ) {}
 
   @Process('shoemaker-update-location')
@@ -31,12 +31,15 @@ export class UpdateLocationConsumer {
 
       const h = h3.latLngToCell(lat, lng, RESOLUTION);
       console.log('h', h);
-      // TODO: Update socket gateway
-      // const socket = await this.gateWaysService.getSocket(userId);
-      // if (socket) {
-      //   this.logger.log('socket', socket.id);
-      //   socket.to(userId).emit('update-location', { lat, lng });
-      // }
+      const socketId = await this.socketService.getSocketIdByUserId(userId);
+      if (socketId) {
+        this.logger.log('socketId: ', socketId);
+        await this.socketService.sendMessageToRoom({
+          roomName: userId,
+          event: 'update-location',
+          data: { lat, lng },
+        });
+      }
       await this.shoemakerRepository.update(
         { id: userId },
         {

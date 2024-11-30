@@ -9,6 +9,7 @@ import { TripsConsumer } from './consumer/trips.consumer';
 import { TripsController } from './trips.controller';
 import { TripsService } from './trips.service';
 import { TripCancellationRepository } from 'src/database/repository/tripCancellation.repository';
+import { SocketModule } from '@modules/socket/socket.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { TripCancellationRepository } from 'src/database/repository/tripCancella
         name: QUEUE_NAMES.CUSTOMERS_TRIP,
       },
     ),
+    SocketModule,
   ],
   controllers: [TripsController],
   providers: [

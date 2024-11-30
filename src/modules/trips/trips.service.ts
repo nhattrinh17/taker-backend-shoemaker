@@ -11,12 +11,12 @@ import { orderId as generateOrderId } from '@common/helpers/index';
 import { DEFAULT_MESSAGES, EventEmitSocket, PartialStatusEnum, StatusEnum } from '@common/index';
 import { FirebaseService } from '@common/services/firebase.service';
 import { Notification, Shoemaker, Transaction, Trip, Wallet, WalletLog } from '@entities/index';
-// import { GatewaysService } from '@gateways/gateways.service';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { CancelTripDto, UpdateTripDto } from './dto/update-trip.dto';
 import { TripCancellationRepositoryInterface } from 'src/database/interface/tripCancellation.interface';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { SocketService } from '@modules/socket/socket.service';
 
 @Injectable()
 export class TripsService {
@@ -27,7 +27,7 @@ export class TripsService {
     private readonly shoemakerRepository: Repository<Shoemaker>,
     @InjectRepository(Notification)
     private readonly notificationRepository: Repository<Notification>,
-    // private readonly gateWaysService: GatewaysService,
+    private readonly socketService: SocketService,
     @InjectRepository(Wallet)
     private readonly walletRepository: Repository<Wallet>,
     private readonly configService: ConfigService,
@@ -57,7 +57,7 @@ export class TripsService {
       });
       if (!trip) throw new NotFoundException('Trip not found');
       // TODO: Update socket
-      // const socket = await this.gateWaysService.getSocket(trip.customerId);
+      const socketCustomerId = await this.socketService.getSocketIdByUserId(trip.customerId);
       let statusUpdate = '';
       if (status === PartialStatusEnum.MEETING && trip.status === StatusEnum.ACCEPTED) {
         statusUpdate = StatusEnum.MEETING;
@@ -101,18 +101,28 @@ export class TripsService {
       if (statusUpdate) {
         await this.tripRepository.update(tripId, trip);
         // update to customer and shoemaker
-        // if (socket) {
-        //   socket.emit(EventEmitSocket.UpdateTripStatus, {
-        //     type: 'success',
-        //     status: StatusEnum.COMPLETED,
-        //   });
-        //   socket.leave(trip.shoemakerId);
-        // }
-        // // update to admins
-        // this.gateWaysService.emitToRoomWithServer(RoomNameAdmin, EventEmitSocket.UpdateTripStatus, {
-        //   id: trip.id,
-        //   status: statusUpdate,
-        // });
+        if (socketCustomerId) {
+          await this.socketService.sendMessageToRoom({
+            data: {
+              type: 'success',
+              status: statusUpdate,
+            },
+            event: EventEmitSocket.UpdateTripStatus,
+            roomName: userId,
+          });
+          // TODO: update leave room
+          // socket.leave(trip.shoemakerId);
+        }
+        // update to admins
+        await this.socketService.sendMessageToRoom({
+          data: {
+            id: trip.id,
+            status: statusUpdate,
+          },
+          event: EventEmitSocket.UpdateTripStatus,
+          roomName: RoomNameAdmin,
+        });
+
         return DEFAULT_MESSAGES.SUCCESS;
       }
       throw new BadRequestException('Invalid status');
