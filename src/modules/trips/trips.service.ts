@@ -17,6 +17,7 @@ import { CancelTripDto, UpdateTripDto } from './dto/update-trip.dto';
 import { TripCancellationRepositoryInterface } from 'src/database/interface/tripCancellation.interface';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SocketService } from '@modules/socket/socket.service';
+import { BullQueueService } from '@modules/bullQueue/bullQueue.service';
 
 @Injectable()
 export class TripsService {
@@ -34,12 +35,11 @@ export class TripsService {
     private readonly dataSource: DataSource,
     @InjectRepository(Transaction)
     private readonly transactionRepository: Repository<Transaction>,
-    @InjectQueue(QUEUE_NAMES.NOTIFICATION) private notificationQueue: Queue,
-    @InjectQueue(QUEUE_NAMES.CUSTOMERS_TRIP) private queue: Queue,
     private readonly firebaseService: FirebaseService,
     @Inject('TripCancellationRepositoryInterface')
     private readonly tripCancellationRepository: TripCancellationRepositoryInterface,
     private readonly eventEmitter: EventEmitter2,
+    private readonly bullQueueService: BullQueueService,
   ) {}
 
   /**
@@ -56,7 +56,6 @@ export class TripsService {
         id: tripId,
       });
       if (!trip) throw new NotFoundException('Trip not found');
-      // TODO: Update socket
       const socketCustomerId = await this.socketService.getSocketIdByUserId(trip.customerId);
       let statusUpdate = '';
       if (status === PartialStatusEnum.MEETING && trip.status === StatusEnum.ACCEPTED) {
@@ -84,13 +83,14 @@ export class TripsService {
         //   content: `Đơn hàng của bạn đã hoàn thành. Đánh giá ngay`,
         //   data: JSON.stringify({ tripId: trip.id }),
         // });
-        this.notificationQueue.add(
+        this.bullQueueService.addNotificationToQueue(
           'after-trip-success-5-minutes',
           {
             customerId: trip.customerId,
           },
-          { delay: 5 * 60 * 1000, removeOnComplete: true }, // 5 * 60 * 1000
+          { delay: 5 * 60 * 1000 },
         );
+
         // Update wallet
         try {
           await this.updateWallet(trip);
@@ -110,8 +110,10 @@ export class TripsService {
             event: EventEmitSocket.UpdateTripStatus,
             roomName: userId,
           });
-          // TODO: update leave room
-          // socket.leave(trip.shoemakerId);
+          await this.bullQueueService.addQueueLeaveRoom({
+            socketId: socketCustomerId,
+            roomName: trip.shoemakerId,
+          });
         }
         // update to admins
         await this.socketService.sendMessageToRoom({
@@ -185,14 +187,10 @@ export class TripsService {
           });
           // Create notification for shoemaker
           const randomContent = SHOEMAKER.generateWalletMessage(amount, '-', trip.orderId);
-          this.notificationQueue.add(
-            'update-wallet',
-            {
-              shoemakerId: trip.shoemakerId,
-              message: randomContent.mes03,
-            },
-            { removeOnComplete: true },
-          );
+          this.bullQueueService.addNotificationToQueue('update-wallet', {
+            shoemakerId: trip.shoemakerId,
+            message: randomContent.mes03,
+          });
         });
       } else if (trip.paymentMethod === PaymentEnum.DIGITAL_WALLET || (trip.paymentMethod === PaymentEnum.CREDIT_CARD && trip.paymentStatus === PaymentStatusEnum.PAID)) {
         await this.dataSource.transaction(async (manager) => {
@@ -242,14 +240,10 @@ export class TripsService {
 
           // Create notification for shoemaker
           const randomContent = SHOEMAKER.generateWalletMessage(amount, '+', trip.orderId);
-          this.notificationQueue.add(
-            'update-wallet',
-            {
-              shoemakerId: trip.shoemakerId,
-              message: randomContent.mes02,
-            },
-            { removeOnComplete: true },
-          );
+          this.bullQueueService.addNotificationToQueue('update-wallet', {
+            shoemakerId: trip.shoemakerId,
+            message: randomContent.mes02,
+          });
         });
       }
     } catch (error) {
@@ -348,7 +342,7 @@ export class TripsService {
         // Clean job trip
         try {
           if (trip.jobId) {
-            const job = await this.queue.getJob(trip.jobId);
+            const job = await this.bullQueueService.getJobTrip(trip.jobId);
             if (job && (await job.isActive())) {
               await job.moveToCompleted('Canceled by customer', true);
             } else if (job) {
@@ -360,31 +354,32 @@ export class TripsService {
         }
 
         // Send to customer
-        // TODO: Update socket gateway
-        // const socketCustomer = await this.gateWaysService.getSocket(trip.customerId);
-
-        // if (socketCustomer) {
-        //   socketCustomer.emit(EventEmitSocket.UpdateTripStatus, {
-        //     type: 'shoemaker-cancel',
-        //     message: 'Trip has been canceled by the shoemaker.',
-        //   });
-        // }
+        const socketCustomerId = await this.socketService.getSocketIdByUserId(trip.customerId);
+        if (socketCustomerId) {
+          await this.socketService.sendMessageToRoom({
+            data: {
+              type: 'shoemaker-cancel',
+              message: 'Trip has been canceled by the shoemaker.',
+            },
+            event: EventEmitSocket.UpdateTripStatus,
+            roomName: socketCustomerId,
+          });
+        }
         // retry find shoemaker
         if (trip.scheduleTime) {
           const jobId = `${QUEUE_NAMES.CUSTOMERS_TRIP}-${trip.id}`;
           await this.tripRepository.update(trip.id, { jobId });
-          this.queue.add(
+          this.bullQueueService.addRequestTripToQueue(
             'trip-schedule',
             { tripId: trip.id, userId, statusSchedule: StatusScheduleShoemaker.findShoemaker },
             {
-              delay: 3000,
-              removeOnComplete: true,
+              delay: 2000,
               jobId: jobId,
             },
           );
         } else {
           // Find other shoemaker
-          const job = await this.queue.add(
+          const job = await this.bullQueueService.addRequestTripToQueue(
             'find-closest-shoemakers',
             {
               tripId: dto.tripId,
@@ -392,16 +387,18 @@ export class TripsService {
               userId: trip.shoemakerId,
             },
             {
-              delay: 3000,
-              removeOnComplete: true,
+              delay: 2000,
             },
           );
+
           await this.tripRepository.update(trip.id, { jobId: job.id as string });
-          // TODO: Update socket
+
           // Leave the room and prevent the customer from receiving updates
-          // if (socketCustomer) {
-          //   socketCustomer.leave(trip.shoemakerId);
-          // }
+          const socketCustomerId = await this.socketService.getSocketIdByUserId(trip.customerId);
+          await this.bullQueueService.addQueueLeaveRoom({
+            roomName: trip.shoemakerId,
+            socketId: socketCustomerId,
+          });
         }
 
         const dataUpdateUser = trip.scheduleTime

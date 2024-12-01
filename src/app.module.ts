@@ -15,6 +15,7 @@ import { WalletsModule } from '@modules/wallets/wallets.module';
 import { BonusPointModule } from '@modules/bonus_point/bonus_point.module';
 import { OptionsModule } from '@modules/options/options.module';
 import { BlogModule } from '@modules/blog/blog.module';
+import { BullQueueModule } from '@modules/bullQueue/bullQueue.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { BlogModule } from '@modules/blog/blog.module';
       },
     }),
     EventEmitterModule.forRoot({ verboseMemoryLeak: true }),
+    BullQueueModule,
     AuthenticationModule,
     ProfileModule,
     ActivitiesModule,

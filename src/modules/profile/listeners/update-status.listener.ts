@@ -6,26 +6,27 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { Queue } from 'bull';
 import { Redis } from 'ioredis';
 
-import { QUEUE_NAMES } from '@common/index';
+import { QUEUE_NAMES, TIME_DELAY_CHANGE_STATUS_ONLINE } from '@common/index';
+import { BullQueueService } from '@modules/bullQueue/bullQueue.service';
 
 @Injectable()
 export class UpdateStatusListener {
   private readonly logger = new Logger(UpdateStatusListener.name);
 
   constructor(
-    @InjectQueue(QUEUE_NAMES.UPDATE_STATUS) private queue: Queue,
     private readonly redis: RedisService,
+    private readonly bullQueueService: BullQueueService,
   ) {}
 
   @OnEvent('shoemaker-update-status')
   async handleUpdateLocationListener(data: { userId: string; isOnline: boolean }) {
     try {
-      this.queue.add('shoemaker-update-status', data, {
+      this.bullQueueService.addUpdateStatusShoemakerToQueue('shoemaker-update-status', data, {
         removeOnComplete: true,
       });
       if (data.isOnline) {
         console.log('Update isOnline to true for shoemakers ', data.userId);
-        const key = await this.redis.setExpire(data.userId, 'online', 60 * 60 * 60);
+        const key = await this.redis.setExpire(data.userId, 'online', TIME_DELAY_CHANGE_STATUS_ONLINE);
         console.log('Set Expire for key: ', await this.redis.getExpired(data.userId));
       }
     } catch (error) {

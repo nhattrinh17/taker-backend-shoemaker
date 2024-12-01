@@ -46,6 +46,8 @@ export interface Location {
 
 export const RESOLUTION = 9;
 
+export const TIME_DELAY_CHANGE_STATUS_ONLINE = 60 * 60 * 60;
+
 export interface IPlaceDetail {
   title: string;
   address: {

@@ -11,6 +11,7 @@ import { Queue } from 'bull';
 import { IPeriod } from '@common/constants/app.constant';
 import { getDatesByWeekOrMonth } from '@common/helpers/date.helper';
 import { FcmTokenDto, ReferralDto, UpdateProfileDto } from './dto/profile.dto';
+import { BullQueueService } from '@modules/bullQueue/bullQueue.service';
 
 @Injectable()
 export class ProfileService {
@@ -20,7 +21,7 @@ export class ProfileService {
     private readonly s3: S3Service,
     @InjectRepository(Trip)
     private readonly tripRepository: Repository<Trip>,
-    @InjectQueue(QUEUE_NAMES.WORK_STATUS) private queue: Queue,
+    private readonly bullQueueService: BullQueueService,
   ) {}
 
   /**
@@ -182,7 +183,15 @@ export class ProfileService {
       // If user work status is false, send notification to user after 5 minutes
       if (user.isOn) {
         // Send notification to user after 5 minutes
-        this.queue.add('work-status', { userId: user.id }, { delay: 5 * 60 * 1000, removeOnComplete: true });
+        this.bullQueueService.addWorkStatusToQueue(
+          'work-status',
+          {
+            userId: user.id,
+          },
+          {
+            delay: 5 * 60 * 1000,
+          },
+        );
       }
       return DEFAULT_MESSAGES.SUCCESS;
     } catch (e) {

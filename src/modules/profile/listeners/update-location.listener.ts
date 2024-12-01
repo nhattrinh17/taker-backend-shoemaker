@@ -6,7 +6,8 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { Queue } from 'bull';
 import { Redis } from 'ioredis';
 
-import { Location, QUEUE_NAMES } from '@common/index';
+import { Location, QUEUE_NAMES, TIME_DELAY_CHANGE_STATUS_ONLINE } from '@common/index';
+import { BullQueueService } from '@modules/bullQueue/bullQueue.service';
 
 @Injectable()
 export class UpdateLocationListener {
@@ -14,17 +15,14 @@ export class UpdateLocationListener {
 
   constructor(
     private readonly redis: RedisService,
-    @InjectQueue(QUEUE_NAMES.UPDATE_LOCATION) private queue: Queue,
+    private readonly bullQueueService: BullQueueService,
   ) {}
 
   @OnEvent('shoemaker-update-location')
   async handleUpdateLocationListener(data: Location & { userId: string }) {
     try {
-      this.queue.add('shoemaker-update-location', data, {
-        removeOnComplete: true,
-      });
-      //TODO update to duration time: 30 minutes
-      // this.redis.setExpire(data.userId, 'online', 60 * 15);
+      this.bullQueueService.addUpdateLocationQueue('shoemaker-update-location', data);
+      this.redis.setExpire(data.userId, 'online', TIME_DELAY_CHANGE_STATUS_ONLINE);
     } catch (error) {
       this.logger.error(error);
     }

@@ -1,8 +1,5 @@
 import { QUEUE_NAMES } from '@common/constants/app.constant';
-import {
-  CUSTOMERS,
-  NOTIFICATIONS_SCREEN,
-} from '@common/constants/notifications.constant';
+import { CUSTOMERS, NOTIFICATIONS_SCREEN } from '@common/constants/notifications.constant';
 import { FirebaseService } from '@common/services';
 import { Customer } from '@entities/customer.entity';
 import { Notification } from '@entities/notification.entity';
@@ -14,8 +11,8 @@ import { Job } from 'bull';
 import { Repository } from 'typeorm';
 
 @Processor(QUEUE_NAMES.NOTIFICATION)
-export class TripsConsumer {
-  private readonly logger = new Logger(TripsConsumer.name);
+export class BullQueueTripsConsumer {
+  private readonly logger = new Logger(BullQueueTripsConsumer.name);
 
   constructor(
     @InjectRepository(Notification)
@@ -35,9 +32,7 @@ export class TripsConsumer {
       const customer = await this.customerRepository.findOneBy({
         id: customerId,
       });
-      const randomIndex = Math.floor(
-        Math.random() * CUSTOMERS.TRIP_SUCCESS.length,
-      );
+      const randomIndex = Math.floor(Math.random() * CUSTOMERS.TRIP_SUCCESS.length);
       const randomContent = CUSTOMERS.TRIP_SUCCESS[randomIndex];
       await this.notificationRepository.save({
         customerId,
