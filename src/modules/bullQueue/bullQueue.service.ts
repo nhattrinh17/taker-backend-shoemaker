@@ -15,8 +15,8 @@ export class BullQueueService {
     @InjectQueue(QUEUE_NAMES.UPDATE_STATUS) private updateStatusQueue: Queue,
   ) {}
 
-  async addQueueLeaveRoom(dto: QueueLeaveRoomDto) {
-    await this.leaveRoomQueue.add(dto);
+  async addQueueLeaveRoom(name: string, dto: QueueLeaveRoomDto, option?: Bull.JobOptions): Promise<Bull.Job<any>> {
+    return this.leaveRoomQueue.add(name, dto, option);
   }
 
   async addNotificationToQueue(name: string, data: any, option?: Bull.JobOptions): Promise<Bull.Job<any>> {

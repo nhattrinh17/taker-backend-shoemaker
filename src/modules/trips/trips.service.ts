@@ -110,7 +110,7 @@ export class TripsService {
             event: EventEmitSocket.UpdateTripStatus,
             roomName: userId,
           });
-          await this.bullQueueService.addQueueLeaveRoom({
+          await this.bullQueueService.addQueueLeaveRoom('leave-room-websocket', {
             socketId: socketCustomerId,
             roomName: trip.shoemakerId,
           });
@@ -395,7 +395,7 @@ export class TripsService {
 
           // Leave the room and prevent the customer from receiving updates
           const socketCustomerId = await this.socketService.getSocketIdByUserId(trip.customerId);
-          await this.bullQueueService.addQueueLeaveRoom({
+          await this.bullQueueService.addQueueLeaveRoom('leave-room-websocket', {
             roomName: trip.shoemakerId,
             socketId: socketCustomerId,
           });
