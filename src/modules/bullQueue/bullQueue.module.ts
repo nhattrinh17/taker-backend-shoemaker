@@ -3,18 +3,19 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullQueueService } from './bullQueue.service';
 import { QUEUE_NAMES } from '@common/constants';
-import { BullQueueTripsConsumer } from './bullQueuetrips.consumer';
+import { BullQueueTripsConsumer } from './bullQueueTrips.consumer';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FirebaseService } from '@common/index';
-import { Customer, Notification, Shoemaker } from '@entities/index';
+import { Customer, Notification, Shoemaker, Trip } from '@entities/index';
 import { UpdateLocationConsumer } from './bullQueueUpdateLocation.consumer';
 import { UpdateStatusConsumer } from './bullQueueUpdateStatus.consumer';
 import { WorkStatusConsumer } from './bullQueueWorkStatus.consumer';
 import { SocketModule } from '@modules/socket/socket.module';
+import RedisService from '@common/services/redis.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Notification, Customer, Shoemaker]),
+    TypeOrmModule.forFeature([Notification, Customer, Shoemaker, Trip]),
     SocketModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
@@ -61,6 +62,7 @@ import { SocketModule } from '@modules/socket/socket.module';
   ],
   providers: [
     FirebaseService,
+    RedisService,
     BullQueueService,
     // Consumer
     BullQueueTripsConsumer,

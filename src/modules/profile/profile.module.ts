@@ -4,7 +4,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { FirebaseService } from '@common/services/firebase.service';
-import { UpdateLocationListener, UpdateStatusListener } from './listeners';
+import { UpdateLocationListener } from './listeners';
 import { ProfileController } from './profile.controller';
 import { ProfileService } from './profile.service';
 import RedisService from '@common/services/redis.service';
@@ -21,7 +21,6 @@ import { ShoemakersListenerService } from './shoemakers-listener.service';
     ShoemakersListenerService,
     S3Service,
     UpdateLocationListener,
-    UpdateStatusListener,
     FirebaseService,
     RedisService,
   ],

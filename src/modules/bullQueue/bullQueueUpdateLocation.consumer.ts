@@ -20,7 +20,10 @@ export class UpdateLocationConsumer {
     private readonly socketService: SocketService,
   ) {}
 
-  @Process('shoemaker-update-location')
+  @Process({
+    name: 'shoemaker-update-location',
+    concurrency: 5,
+  })
   async handleFindClosestShoemakers(job: Job<unknown>) {
     try {
       const { lat, lng, userId } = job.data as Location & {
