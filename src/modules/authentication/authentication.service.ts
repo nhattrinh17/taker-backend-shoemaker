@@ -133,16 +133,6 @@ export class AuthenticationService {
       };
       if (dto.password) dataCreate.password = generateHashedPassword(dto.password || '');
       const user = await this.userRepository.save(dataCreate);
-      if (dto.referralCode) {
-        const referralUser = await this.userRepository.findOneBy({ phone: dto.referralCode });
-        if (referralUser) {
-          await Promise.all([
-            //
-            this.bonusPointService.checkAndAddPointToReferralUser(referralUser.id),
-            this.bonusPointService.checkAndAddPointToReferralUser(user.id),
-          ]);
-        }
-      }
 
       return { userId: user.id };
     } catch (e) {
@@ -161,6 +151,17 @@ export class AuthenticationService {
     try {
       const user = await this.userRepository.findOneBy({ id: userId, otp });
       if (!user) throw new BadRequestException('Invalid OTP');
+      // Check and pay reward to referrer
+      if (user.referralCode && !user.isVerified) {
+        const referralUser = await this.userRepository.findOneBy({ phone: user.referralCode });
+        if (referralUser) {
+          await Promise.all([
+            //
+            this.bonusPointService.checkAndAddPointToReferralUser(referralUser.id),
+            this.bonusPointService.checkAndAddPointToReferralUser(user.id),
+          ]);
+        }
+      }
 
       // change step to New Password if status is pending
       if (user.status === ShoemakerStatusEnum.PENDING && !user.isVerified) {
