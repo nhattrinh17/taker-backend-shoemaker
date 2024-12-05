@@ -108,12 +108,13 @@ export class TripsService {
               status: statusUpdate,
             },
             event: EventEmitSocket.UpdateTripStatus,
-            roomName: userId,
+            roomName: socketCustomerId,
           });
-          await this.bullQueueService.addQueueLeaveRoom('leave-room-websocket', {
-            socketId: socketCustomerId,
-            roomName: trip.shoemakerId,
-          });
+          statusUpdate == StatusEnum.COMPLETED &&
+            (await this.bullQueueService.addQueueLeaveRoom('leave-room-websocket', {
+              socketId: socketCustomerId,
+              roomName: trip.shoemakerId,
+            }));
         }
         // update to admins
         await this.socketService.sendMessageToRoom({
@@ -129,6 +130,7 @@ export class TripsService {
       }
       throw new BadRequestException('Invalid status');
     } catch (e) {
+      console.log('🚀 ~ TripsService ~ updateTripStatus ~ e:', e);
       throw new BadRequestException(e.message);
     }
   }
