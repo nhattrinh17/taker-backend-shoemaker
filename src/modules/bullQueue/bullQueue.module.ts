@@ -3,7 +3,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullQueueService } from './bullQueue.service';
 import { QUEUE_NAMES } from '@common/constants';
-import { BullQueueTripsConsumer } from './bullQueueTrips.consumer';
+import { BullQueueTripsConsumer } from './bullQueueTrip.consumer';
+import { BullQueueNotificationConsumer } from './bullQueueNotification.consumer';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FirebaseService } from '@common/index';
 import { Customer, Notification, Shoemaker, Trip } from '@entities/index';
@@ -69,6 +70,7 @@ import RedisService from '@common/services/redis.service';
     UpdateLocationConsumer,
     UpdateStatusConsumer,
     WorkStatusConsumer,
+    BullQueueNotificationConsumer,
   ],
   exports: [BullQueueService],
 })

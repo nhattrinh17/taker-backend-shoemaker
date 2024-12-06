@@ -4,15 +4,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Not, Repository } from 'typeorm';
 
 import { QUEUE_NAMES, RoomNameAdmin, StatusScheduleShoemaker } from '@common/constants/app.constant';
-import { NOTIFICATIONS_SCREEN, SHOEMAKER } from '@common/constants/notifications.constant';
+import { SHOEMAKER } from '@common/constants/notifications.constant';
 import { PaymentEnum, PaymentStatusEnum } from '@common/enums/payment.enum';
 import { TransactionSource, TransactionStatus, TransactionType } from '@common/enums/transaction.enum';
 import { orderId as generateOrderId } from '@common/helpers/index';
 import { DEFAULT_MESSAGES, EventEmitSocket, PartialStatusEnum, StatusEnum } from '@common/index';
 import { FirebaseService } from '@common/services/firebase.service';
 import { Notification, Shoemaker, Transaction, Trip, Wallet, WalletLog } from '@entities/index';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
 import { CancelTripDto, UpdateTripDto } from './dto/update-trip.dto';
 import { TripCancellationRepositoryInterface } from 'src/database/interface/tripCancellation.interface';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -110,11 +108,11 @@ export class TripsService {
             event: EventEmitSocket.UpdateTripStatus,
             roomName: socketCustomerId,
           });
-          statusUpdate == StatusEnum.COMPLETED &&
-            (await this.bullQueueService.addQueueLeaveRoom('leave-room-websocket', {
-              socketId: socketCustomerId,
-              roomName: trip.shoemakerId,
-            }));
+
+          await this.bullQueueService.addQueueLeaveRoom('leave-room-websocket', {
+            socketId: socketCustomerId,
+            roomName: trip.shoemakerId,
+          });
         }
         // update to admins
         await this.socketService.sendMessageToRoom({
@@ -397,10 +395,11 @@ export class TripsService {
 
           // Leave the room and prevent the customer from receiving updates
           const socketCustomerId = await this.socketService.getSocketIdByUserId(trip.customerId);
-          await this.bullQueueService.addQueueLeaveRoom('leave-room-websocket', {
-            roomName: trip.shoemakerId,
-            socketId: socketCustomerId,
-          });
+          socketCustomerId &&
+            (await this.bullQueueService.addQueueLeaveRoom('leave-room-websocket', {
+              roomName: trip.shoemakerId,
+              socketId: socketCustomerId,
+            }));
         }
 
         const dataUpdateUser = trip.scheduleTime
